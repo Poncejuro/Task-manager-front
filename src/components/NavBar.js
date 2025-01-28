@@ -20,7 +20,7 @@ const Navbar = () => {
       <Toolbar>
 
         <Typography variant="h6" sx={{ flexGrow: 1 }}>
-          UserPage
+          Menu example
         </Typography>
 
         <Button color="inherit" onClick={handleLogout}>LogOut</Button>

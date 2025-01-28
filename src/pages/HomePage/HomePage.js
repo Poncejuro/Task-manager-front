@@ -1,148 +1,234 @@
-import React, { useEffect, useState } from 'react';
-import { UserService } from '../../services'; 
-import { styled } from '@mui/material/styles';
-import Table from '@mui/material/Table';
-import TableBody from '@mui/material/TableBody';
-import TableCell, { tableCellClasses } from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
-import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import Paper from '@mui/material/Paper';
-import {TextField, Grid } from '@mui/material';
+import React, { useEffect, useState } from "react";
+import { TaskService } from "../../services"; 
+import { useSelector } from "react-redux";
+import { CustomTable } from "../../components"; 
+import {
+  Box,
+  Container,
+  Typography,
+  TextField,
+  Button,
+} from "@mui/material";
 
 const HomePage = () => {
-  const [users, setUsers] = useState([]);
-  const [filters, setFilters] = useState({
-    firstName: '',
-    lastName: '',
-    email: '',
-    phoneNumber: ''
-  });
+  const [tasks, setTasks] = useState([]);
+  const [title, setTitle] = useState("");
+  const [description, setDescription] = useState("");
+  const [status, setStatus] = useState("in progress");
+  const [error, setError] = useState(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [taskId, setTaskId] = useState(""); // Para el ID de la tarea que se actualizará
+  const [isUpdating, setIsUpdating] = useState(false); // Para saber si estamos en el modo de actualización
+  const token = useSelector((state) => state.auth.token);
 
   useEffect(() => {
-    const fetchUsers = async () => {
+    const fetchTasks = async () => {
+      if (!token) return; 
       try {
-        const usersData = await UserService(); 
-        setUsers(usersData); 
+        const tasksData = await TaskService.getAll(token); 
+        setTasks(tasksData); 
       } catch (error) {
-        console.error('Error al obtener los usuarios:', error);
+        console.error("Error al obtener las tareas:", error);
       }
     };
 
-    fetchUsers();
-  }, []);
+    fetchTasks();
+  }, [token]); 
 
-  const StyledTableCell = styled(TableCell)(({ theme }) => ({
-    [`&.${tableCellClasses.head}`]: {
-      backgroundColor: theme.palette.common.black,
-      color: theme.palette.common.white,
-    },
-    [`&.${tableCellClasses.body}`]: {
-      fontSize: 14,
-    },
-  }));
-  
-  const StyledTableRow = styled(TableRow)(({ theme }) => ({
-    '&:nth-of-type(odd)': {
-      backgroundColor: theme.palette.action.hover,
-    },
-    '&:last-child td, &:last-child th': {
-      border: 0,
-    },
-  }));
+  const columns = [
+    { label: "Id", field: "id" }, 
+    { label: "Title", field: "title" }, 
+    { label: "Description", field: "description", align: "right" },
+    { label: "Status", field: "status", align: "right" },  
+    { label: "Actions", field: "actions", render: (task) => (
+      <>
+        <Button onClick={() => handleDeleteTask(task.id)}>Delete</Button>
+      </>
+    )}
+  ];
 
-  const handleFilterChange = (e) => {
-    const { name, value } = e.target;
-    setFilters((prevFilters) => ({
-      ...prevFilters,
-      [name]: value,
-    }));
+  const handleAddTask = async (e) => {
+    e.preventDefault();
+
+    if (!title || !description) {
+      setError("Both title and description are required.");
+      return;
+    }
+
+    if (!token) {
+      setError("Invalid or missing token");
+      return;
+    }
+
+    const taskData = { title, description, status };
+
+    try {
+      setIsLoading(true);
+      await TaskService.create(token, taskData);
+      setTitle("");
+      setDescription("");
+      setStatus("in progress");
+      setError(null);
+      const updatedTasks = await TaskService.getAll(token);
+      setTasks(updatedTasks);
+    } catch (error) {
+      setError("Failed to add the task.");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const filteredUsers = users.filter((user) => {
-    return (
-      user.firstName.toLowerCase().includes(filters.firstName.toLowerCase()) &&
-      user.lastName.toLowerCase().includes(filters.lastName.toLowerCase()) &&
-      user.email.toLowerCase().includes(filters.email.toLowerCase()) &&
-      user.phoneNumber.toLowerCase().includes(filters.phoneNumber.toLowerCase())
-    );
-  });
+  const handleUpdateTask = async (e) => {
+    e.preventDefault();
+
+    if (!taskId) {
+      setError("Task ID is required to update.");
+      return;
+    }
+
+    if (!title || !description) {
+      setError("Both title and description are required.");
+      return;
+    }
+
+    if (!token) {
+      setError("Invalid or missing token");
+      return;
+    }
+
+    const taskData = { title, description, status };
+
+    try {
+      setIsLoading(true);
+      await TaskService.update(token, taskId, taskData);
+      setTitle("");
+      setDescription("");
+      setStatus("in progress");
+      setTaskId("");
+      setIsUpdating(false);
+      setError(null);
+      const updatedTasks = await TaskService.getAll(token);
+      setTasks(updatedTasks);
+    } catch (error) {
+      setError("Failed to update the task.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleDeleteTask = async (taskId) => {
+    try {
+      await TaskService.delete(token, taskId);
+      const updatedTasks = await TaskService.getAll(token);
+      setTasks(updatedTasks);
+    } catch (error) {
+      setError("Failed to delete the task.");
+    }
+  };
+
+  const toggleFormMode = () => {
+    setIsUpdating(!isUpdating);
+    setTitle("");
+    setDescription("");
+    setStatus("in progress");
+    setTaskId("");
+    setError(null);
+  };
 
   return (
     <div>
-      <Grid container spacing={2} sx={{ marginBottom: '20px' }}>
-        <Grid item xs={3}>
-          <TextField
-            label="First Name"
-            variant="outlined"
-            fullWidth
-            name="firstName"
-            value={filters.firstName}
-            onChange={handleFilterChange}
-          />
-        </Grid>
-        <Grid item xs={3}>
-          <TextField
-            label="Last Name"
-            variant="outlined"
-            fullWidth
-            name="lastName"
-            value={filters.lastName}
-            onChange={handleFilterChange}
-          />
-        </Grid>
-        <Grid item xs={3}>
-          <TextField
-            label="Email"
-            variant="outlined"
-            fullWidth
-            name="email"
-            value={filters.email}
-            onChange={handleFilterChange}
-          />
-        </Grid>
-        <Grid item xs={3}>
-          <TextField
-            label="Phone Number"
-            variant="outlined"
-            fullWidth
-            name="phoneNumber"
-            value={filters.phoneNumber}
-            onChange={handleFilterChange}
-          />
-        </Grid>
-      </Grid>
+      <Container component="main" maxWidth="lg">
+        <Box
+          sx={{
+            display: 'flex',
+            flexDirection: 'row',
+            gap: 4, 
+            justifyContent: 'space-between',
+            marginTop: 8,
+          }}
+        >
+          <Box sx={{ flex: 1 }}>
+            <Typography component="h1" variant="h5" gutterBottom>
+              {isUpdating ? "Update Task" : "Add Task"}
+            </Typography>
 
-      <TableContainer component={Paper}>
-        <Table sx={{ minWidth: 700 }} aria-label="customized table">
-          <TableHead>
-            <TableRow>
-              <StyledTableCell>First Name</StyledTableCell>
-              <StyledTableCell align="right">Last Name</StyledTableCell>
-              <StyledTableCell align="right">Email</StyledTableCell>
-              <StyledTableCell align="right">Phone Number</StyledTableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredUsers.length > 0 ? (
-              filteredUsers.map((user) => (
-                <StyledTableRow key={user.id}>
-                  <StyledTableCell component="th" scope="row">
-                    {user.firstName}
-                  </StyledTableCell>
-                  <StyledTableCell align="right">{user.lastName}</StyledTableCell>
-                  <StyledTableCell align="right">{user.email}</StyledTableCell>
-                  <StyledTableCell align="right">{user.phoneNumber}</StyledTableCell>
-                </StyledTableRow>
-              ))
-            ) : (
-              <StyledTableRow>
-                <StyledTableCell colSpan={4} align="center">No users found</StyledTableCell>
-              </StyledTableRow>
-            )}
-          </TableBody>
-        </Table>
-      </TableContainer>
+            {error && <Typography color="error">{error}</Typography>}
+
+            <form onSubmit={isUpdating ? handleUpdateTask : handleAddTask} noValidate>
+              {isUpdating && (
+                <TextField
+                  margin="normal"
+                  required
+                  fullWidth
+                  id="taskId"
+                  label="Task ID"
+                  name="taskId"
+                  value={taskId}
+                  onChange={(e) => setTaskId(e.target.value)}
+                  autoFocus
+                />
+              )}
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="title"
+                label="Title"
+                name="title"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+              />
+              <TextField
+                margin="normal"
+                required
+                fullWidth
+                id="description"
+                label="Description"
+                name="description"
+                value={description}
+                onChange={(e) => setDescription(e.target.value)}
+              />
+              <TextField
+                margin="normal"
+                fullWidth
+                id="status"
+                label="Status"
+                name="status"
+                value={status}
+                onChange={(e) => setStatus(e.target.value)}
+              />
+              <Button
+                type="submit"
+                fullWidth
+                variant="contained"
+                sx={{ mt: 3, mb: 2 }}
+                disabled={isLoading}
+              >
+                {isLoading ? 'Processing...' : isUpdating ? 'Update Task' : 'Add Task'}
+              </Button>
+            </form>
+            
+            <Button
+              onClick={toggleFormMode} 
+              fullWidth
+              variant="outlined"
+              sx={{ mt: 3, mb: 2 }}
+            >
+              {isUpdating ? "Switch to Add Mode" : "Switch to Update Mode"}
+            </Button>
+          </Box>
+
+          <Box sx={{ flex: 2 }}>
+            <Typography component="h1" variant="h5" gutterBottom>
+              Task List
+            </Typography>
+
+            <div style={{ paddingLeft: 16, paddingRight: 16 }}>
+              <CustomTable columns={columns} data={tasks} />
+            </div>
+          </Box>
+        </Box>
+      </Container>
     </div>
   );
 };

@@ -1,7 +1,7 @@
 import { LoginService } from "./LoginService";
-import { UserService } from "./UserService";
+import TaskService from "./TaskService";
 
 export{
     LoginService,
-    UserService
+    TaskService
 }
